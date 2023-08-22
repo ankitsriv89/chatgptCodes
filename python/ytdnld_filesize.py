@@ -1,12 +1,9 @@
-"""Write an async python code to download multiple youtube videos using tkinter gui. 
-the code should show the download progress, failure message and ask for the download location.
-add codes in above program to measure and show download time taken after completion.
-"""
+"""add code in above program to compute file size to download and prompt user to continue or abort"""
+
 
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import filedialog
-import asyncio
 import time
 from pytube import YouTube
 
@@ -27,7 +24,7 @@ class YouTubeDownloaderApp:
         self.location_button = tk.Button(root, text="Browse", command=self.select_location)
         self.location_button.pack()
 
-        self.download_button = tk.Button(root, text="Download", command=self.download)
+        self.download_button = tk.Button(root, text="Download", command=self.confirm_download)
         self.download_button.pack()
 
         self.progress_label = tk.Label(root, text="")
@@ -39,23 +36,25 @@ class YouTubeDownloaderApp:
         self.downloading_file = tk.StringVar()
         self.downloading_label = tk.Label(root, textvariable=self.downloading_file)
         self.downloading_label.pack()
-        
 
     def select_location(self):
         self.download_path = filedialog.askdirectory()
         self.location_label.config(text=f"Selected location: {self.download_path}")
 
-    async def download_video(self, url):
+    def compute_file_size(self, url):
+        yt = YouTube(url)
+        video = yt.streams.get_highest_resolution()
+        file_size = video.filesize
+        return file_size
+
+    def download_video(self, url):
         start_time = time.time()
         try:
-            yt = await asyncio.to_thread(YouTube, url)
+            yt = YouTube(url)
             video = yt.streams.get_highest_resolution()
-
             self.download_button.config(state=tk.DISABLED)
             self.downloading_file.set(f"Downloading: {yt.title}")
-            #self.progress_label.config(text=f"Downloading {yt.title}...")
-            
-            await asyncio.to_thread(video.download, output_path=self.download_path)
+            video.download(output_path=self.download_path)
             end_time = time.time()
             self.progress_label.config(text=f"Downloaded {yt.title}")
             download_time = end_time - start_time
@@ -68,10 +67,15 @@ class YouTubeDownloaderApp:
             self.downloading_file.set("")
             self.progress_label.config(text="")
 
-    def download(self):
+    def confirm_download(self):
         url = self.url_entry.get()
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.download_video(url))
+        file_size = self.compute_file_size(url)
+        size_mb = file_size / (1024 * 1024)
+        response = messagebox.askyesno("Confirmation", f"The video size is approximately {size_mb:.2f} MB.\nDo you want to continue with the download?")
+        if response:
+            self.download_video(url)
+        else:
+            messagebox.showinfo("Download Aborted", "Download has been aborted.")
 
     def show_progress(self, stream, chunk, bytes_remaining):
         total_size = stream.filesize
